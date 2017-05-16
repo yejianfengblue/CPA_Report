@@ -7,6 +7,7 @@ today = date.today()
 workDir = "C:\Users\IBM_ADMIN\Desktop\CPA-AOC\Daily Report Team Meeting\\"
 mailToList = ["Lei Wang", "Ce Zheng", "Miao Zhao", "Cong Wang", "Xin Long He", "Hui Xia Tian", "Chu Jiang", "Jin Yu Yan"]
 
+
 def Main():
     logging.info("Generating AOC Open Inc/SR Report for {0} begins.".format(today.strftime("%Y-%m-%d")))
     if (today.weekday() in (5, 6)):
@@ -38,100 +39,105 @@ def Main():
                 attachment.SaveAsFile(srFile)
                 logging.info("srFile = " + srFile)
 
+
     newIncFile = incFile[:incFile.rfind(".")] + ".xlsx"
     newSrFile = srFile[:srFile.rfind(".")] + ".xlsx"
     
-    # Cal business date and get the filename of last business day
-    lastInc = "AOC Open Incident - " + str(LastBizDay(today).strftime("%d %b %Y"))
-    lastSr = "AOC Open SR - " + str(LastBizDay(today).strftime("%d %b %Y"))
-    # Open file of both days
     excel = Dispatch("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
-    excel.ScreenUpdating = False
-    
+    if not DebugMode:
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.ScreenUpdating = False
+    else:
+        excel.Visible = True
+        excel.ScreenUpdating = True
+
+    logging.info("Processing incident file " + str(incFile))
     incWb = excel.Workbooks.Open(incFile)
     incWs = incWb.ActiveSheet
-
-    logging.info("Processing incident sheet " + str(incWs.Name))
-    # Add header and vlookup formula into today's excel
-    incRows = incWs.UsedRange.Rows.Count
-    incEtaVlookup = '''=IFNA(VLOOKUP($A2,'{0}[{1}]{2}'!$A$1:$L$100,11,FALSE),"")'''.format(workDir, lastInc+".xlsx", lastInc)
-    incUpdateVlookup = '''=IFNA(VLOOKUP($A2,'{0}[{1}]{2}'!$A$1:$L$100,12,FALSE),"")'''.format(workDir, lastInc+".xlsx", lastInc)
-    incWs.Range("K1").Value = "Target Date"
-    incWs.Range("K2").Formula = incEtaVlookup
-    incWs.Range("K2").NumberFormat = "yyyy-mm-dd"
-    incWs.Range("L1").Value = "Update"
-    incWs.Range("L2").Formula = incUpdateVlookup
-    incWs.Range("K2:L2").AutoFill(incWs.Range("K2:L"+str(incRows)))
-    incWs.Range("K2:L"+str(incRows)).Copy()
-    incWs.Range("K2:L"+str(incRows)).PasteSpecial(Paste = const.xlPasteValuesAndNumberFormats)
-    incWs.Range("A1:L1").Interior.Color = RGBToInt(0, 176, 240)
-    logging.info("Fill header and formula done.")
-    # Adjust column width
-    incWs.Columns(1).ColumnWidth = 16
-    incWs.Columns(2).ColumnWidth = 10
-    incWs.Columns(3).Hidden = True
-    incWs.Columns(4).ColumnWidth = 5
-    incWs.Range("E:F").Columns.AutoFit()
+    # Delete the first two blank lines
+    incWs.Range("1:2").Delete()    
+    # Set Font
+    incWs.UsedRange.Font.Name = "Calibri"
+    incWs.UsedRange.Font.Size = 11
+    
+    usedRange = incWs.Range(incWs.Cells(1,1), incWs.Columns(12).End(const.xlDown))
+    # Adjust column width, wrap text, hide columns
+    usedRange.WrapText = True
+    incWs.Columns(1).ColumnWidth = 8
+    incWs.Columns(2).ColumnWidth = 24
+    incWs.Columns(3).ColumnWidth = 10
+    incWs.Columns(4).ColumnWidth = 4
+    incWs.Columns(5).ColumnWidth = 6
+    incWs.Columns(6).AutoFit()
+    incWs.Columns(7).Hidden = True
     incWs.Columns(8).Hidden = True
-    incWs.Range("$I:$J").Columns.AutoFit()
+    incWs.Columns(9).AutoFit()
+    incWs.Columns(10).Hidden = True
+    incWs.Columns(11).AutoFit()
+    incWs.Columns(12).ColumnWidth = 40
+    usedRange.Rows.AutoFit()
+    usedRange.VerticalAlignment = const.xlCenter
     logging.info("Adjust column width done.")
     # Add border
     for i in range(7,13):
-        incWs.UsedRange.Borders(i).LineStyle = const.xlContinuous
-        incWs.UsedRange.Borders(i).Weight = const.xlThin
-        incWs.UsedRange.Borders(i).LineStyle = const.xlContinuous
-        incWs.UsedRange.Borders(i).Weight = const.xlThin
+        usedRange.Borders(i).LineStyle = const.xlContinuous
+        usedRange.Borders(i).Weight = const.xlThin
+        usedRange.Borders(i).LineStyle = const.xlContinuous
+        usedRange.Borders(i).Weight = const.xlThin
     logging.info("Borders added.")
     # Save as excel
     incWb.SaveAs(newIncFile, const.xlOpenXMLWorkbook)
     incWb.Close(True)
     logging.info("Incident process completed.")
-    if not DebugMode:
-        os.remove(workDir + lastInc + ".xlsx")
-        logging.info("Last incident file deleted.")
     os.remove(incFile)
-    logging.info("Incident.csv deleted.")
-    
-    
+    logging.info("Incident.xls deleted.")
+
+
+    logging.info("Processing SR file " + str(srFile))
     srWb = excel.Workbooks.Open(srFile)
-    srWs = srWb.ActiveSheet    
+    srWs = srWb.ActiveSheet
     srRows = srWs.UsedRange.Rows.Count
     logging.info("{0} SR(s) today".format(srRows-1))
-    if srRows > 1:    
-        srEtaVlookup = '''=IFNA(VLOOKUP($A2,'{0}[{1}]{2}'!$A$1:$L$100,10,FALSE),"")'''.format(workDir, lastSr+".xlsx", lastSr)
-        srUpdateVlookup = '''=IFNA(VLOOKUP($A2,'{0}[{1}]{2}'!$A$1:$L$100,11,FALSE),"")'''.format(workDir, lastSr+".xlsx", lastSr)
-        srWs.Range("J1").Value = "Target Date"
-        srWs.Range("J2").Formula = srEtaVlookup
-        srWs.Range("J2").NumberFormat = "yyyy-mm-dd"
-        srWs.Range("K1").Value = "Update"
-        srWs.Range("K2").Formula = srUpdateVlookup
-        if srRows > 2:
-            srWs.Range("J2:K2").AutoFill(srWs.Range("J2:K"+str(srRows)))
-        srWs.Range("J2:K"+str(srRows)).Copy()
-        srWs.Range("J2:K"+str(srRows)).PasteSpecial(Paste = const.xlPasteValuesAndNumberFormats)
-        srWs.Range("A1:K1").Interior.Color = RGBToInt(0, 176, 240)
-
-        srWs.Range("A:F").Columns.AutoFit()
-        srWs.Range("G:I").Columns.Hidden = True
-
+    if srRows > 1: 
+        # Delete the first two blank lines
+        srWs.Range("1:2").Delete()    
+        # Set Font
+        srWs.UsedRange.Font.Name = "Calibri"
+        srWs.UsedRange.Font.Size = 11
+        
+        usedRange = srWs.Range(srWs.Cells(1,1), srWs.Columns(10).End(const.xlDown))
+        # Adjust column width, wrap text, hide columns
+        usedRange.WrapText = True
+        srWs.Columns(1).ColumnWidth = 8
+        srWs.Columns(2).ColumnWidth = 24
+        srWs.Columns(3).AutoFit()
+        srWs.Columns(4).AutoFit()
+        srWs.Columns(5).Hidden = True
+        srWs.Columns(6).Hidden = True
+        srWs.Columns(7).AutoFit()
+        srWs.Columns(8).Hidden = True
+        srWs.Columns(9).ColumnWidth = 10
+        srWs.Columns(10).ColumnWidth = 50
+        usedRange.Rows.AutoFit()
+        usedRange.VerticalAlignment = const.xlCenter
+        logging.info("Adjust column width done.")
+        # Add border
         for i in range(7,13):
-            srWs.UsedRange.Borders(i).LineStyle = const.xlContinuous
-            srWs.UsedRange.Borders(i).Weight = const.xlThin
-            srWs.UsedRange.Borders(i).LineStyle = const.xlContinuous
-            srWs.UsedRange.Borders(i).Weight = const.xlThin
+            usedRange.Borders(i).LineStyle = const.xlContinuous
+            usedRange.Borders(i).Weight = const.xlThin
+            usedRange.Borders(i).LineStyle = const.xlContinuous
+            usedRange.Borders(i).Weight = const.xlThin
+        logging.info("Borders added.")
+    # Save as excel
     srWb.SaveAs(newSrFile, const.xlOpenXMLWorkbook)
     srWb.Close(True)
     logging.info("SR process completed.")
-    # excel.Quit()
-    del excel
-    if not DebugMode:
-        os.remove(workDir + lastSr + ".xlsx")
-        logging.info("Last SR file deleted.")
     os.remove(srFile)
-    logging.info("SR.csv deleted")
-    
+    logging.info("SR.xls deleted.")
+    excel.Visible = 1
+    del excel
+ 
     
     # Send email
     logging.info("Draft an email")
